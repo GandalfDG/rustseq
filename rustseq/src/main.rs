@@ -2,6 +2,7 @@ mod block;
 mod db;
 
 use block::Block;
+use db::DB;
 
 fn main() {
     println!("Hello, world!");
@@ -13,6 +14,9 @@ fn main() {
     block2.set_parent(&block1);
     block3.set_parent(&block1);
     block2.set_sibling(&block3);
+
+    let database = DB::connect("test_db.sqlite");
+    database.create_tables();
 
     println!("{:?}", block2);
 }
