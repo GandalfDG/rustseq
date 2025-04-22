@@ -1,24 +1,5 @@
-/// a BlockRow is a direct translation of a block row from the 
-/// database. It will be used to create a tree of Block objects
-/// in memory.
-pub struct BlockRow {
-    id: u32,
-    content: String,
-
-    parent_id: Option<u32>,
-    sibling_id: Option<u32>,
-}
-
-impl BlockRow {
-    pub fn new(id: u32, content: &str, parent_id: Option<u32>, sibling_id: Option<u32>) -> Self {
-        BlockRow {
-            id: id,
-            content: String::from(content),
-            parent_id: parent_id,
-            sibling_id: sibling_id
-        }
-    }
-}
+use crate::db::BlockRow;
+use rusqlite::types::Null;
 
 #[derive(Debug)]
 pub struct Block<'a, 'b> {
@@ -45,5 +26,20 @@ impl<'a, 'b> Block<'a, 'b> {
 
     pub fn set_sibling(&mut self, sibling: &'b Block) {
         self.next_sibling = Option::Some(sibling);
+    }
+
+    pub fn as_block_row(&self) -> BlockRow {
+        // parent ID or rusqlite::types::Null
+        let parent_id = match self.parent {
+            Some(parent_block) => Some(parent_block.id),
+            None => None
+        };
+
+        let sibling_id = match self.next_sibling {
+            Some(sibling_block) => Some(sibling_block.id),
+            None => None
+        };
+
+        BlockRow::new(self.id, &self.content, parent_id, sibling_id)
     }
 }
