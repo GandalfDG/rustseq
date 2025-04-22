@@ -1,5 +1,4 @@
 use crate::db::BlockRow;
-use rusqlite::types::Null;
 
 #[derive(Debug)]
 pub struct Block<'a, 'b> {
