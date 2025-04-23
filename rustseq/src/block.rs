@@ -2,7 +2,7 @@ use crate::db::BlockRow;
 
 #[derive(Debug)]
 pub struct Block<'a, 'b> {
-    id: u32,
+    id: i64,
     content: String,
 
     parent: Option<&'a Block<'a,'b>>,
@@ -10,7 +10,7 @@ pub struct Block<'a, 'b> {
 }
 
 impl<'a, 'b> Block<'a, 'b> {
-    pub fn new(id: u32, content: &str) -> Self {
+    pub fn new(id: i64, content: &str) -> Self {
         Block {
             id: id,
             content: String::from(content),
@@ -39,6 +39,6 @@ impl<'a, 'b> Block<'a, 'b> {
             None => None
         };
 
-        BlockRow::new(self.id, &self.content, parent_id, sibling_id)
+        BlockRow::new(Some(self.id), &self.content, parent_id, sibling_id)
     }
 }
