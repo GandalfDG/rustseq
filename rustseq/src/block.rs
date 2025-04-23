@@ -39,6 +39,6 @@ impl<'a, 'b> Block<'a, 'b> {
             None => None
         };
 
-        BlockRow::new(Some(self.id), &self.content, parent_id, sibling_id)
+        BlockRow {id: Some(self.id), content: String::from(&self.content), parent_id: parent_id, sibling_id: sibling_id, page_id: None}
     }
 }

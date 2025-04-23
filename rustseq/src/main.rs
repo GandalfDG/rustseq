@@ -32,19 +32,17 @@ fn main() {
     block2.set_parent(&block1);
     block3.set_parent(&block1);
     block2.set_sibling(&block3);
-    
-    
-    database.store_block(&block1);
-    database.store_block(&block2);
-    database.store_block(&block3);
+
     println!("{:?}", block2);
     println!("{:?}", block1.as_block_row());
     println!("{:?}", block2.as_block_row());
     println!("{:?}", block3.as_block_row());
 
-    let row = block3.as_block_row();
 
-    let row_in_db = database.create_block(Some(&row.content), row.parent_id, row.sibling_id).unwrap();
-    println!("{:?}", row_in_db);
-
+    let mut block_id = database.insert_block(&mut block1.as_block_row()).unwrap();
+    println!("{:?}", block_id);
+    block_id = database.insert_block(&mut block2.as_block_row()).unwrap();
+    println!("{:?}", block_id);
+    block_id = database.insert_block(&mut block3.as_block_row()).unwrap();
+    println!("{:?}", block_id);
 }
