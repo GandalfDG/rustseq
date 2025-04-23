@@ -6,7 +6,6 @@ use std::fs;
 use block::Block;
 use db::DB;
 
-
 const TEST_DB_PATH: &str = "test_db.sqlite";
 
 fn init_test_db() -> DB {
@@ -39,10 +38,14 @@ fn main() {
     println!("{:?}", block3.as_block_row());
 
 
-    let mut block_id = database.insert_block(&mut block1.as_block_row()).unwrap();
-    println!("{:?}", block_id);
-    block_id = database.insert_block(&mut block2.as_block_row()).unwrap();
+    let root_block_id = database.insert_block(&mut block1.as_block_row()).unwrap();
+    println!("{:?}", root_block_id);
+    let mut block_id = database.insert_block(&mut block2.as_block_row()).unwrap();
     println!("{:?}", block_id);
     block_id = database.insert_block(&mut block3.as_block_row()).unwrap();
     println!("{:?}", block_id);
+
+    let page_id = database.insert_page(&mut db::PageRow{id: None, title: String::from("test page"), root_block_id: Some(root_block_id)});
+
+    println!("{}", page_id.unwrap())
 }

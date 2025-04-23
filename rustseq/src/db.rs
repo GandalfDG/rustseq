@@ -81,6 +81,6 @@ pub struct PageRow {
    pub id: Option<i64>,
    pub title: String,
 
-   pub root_block_id: Option<u32> 
+   pub root_block_id: Option<i64> 
 }
 
