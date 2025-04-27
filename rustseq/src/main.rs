@@ -47,5 +47,11 @@ fn main() {
 
     let page_id = database.insert_page(&mut db::PageRow{id: None, title: String::from("test page"), root_block_id: Some(root_block_id)});
 
-    println!("{}", page_id.unwrap())
+    println!("{}", page_id.unwrap());
+
+    println!("{:?}", database.get_page_blocks(&db::PageRow{
+        id: Some(1),
+        title: String::from("lol"),
+        root_block_id: Some(1)
+    }))
 }

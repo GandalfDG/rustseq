@@ -61,6 +61,31 @@ impl DB {
         transaction.commit()?;
         Ok(new_page.id.expect("no page ID"))
     }
+
+    pub fn get_page_blocks(&mut self, page: &PageRow) -> Result<Vec<BlockRow>, rusqlite::Error> {
+        let transaction = self.connection.transaction()?;
+
+        let mut statement = transaction.prepare("SELECT * FROM blocks WHERE page=?1")?;
+
+        let rows = statement.query_map((page.id.unwrap(),), |row| {
+            Ok(BlockRow{
+                id: row.get(0)?,
+                content: row.get(1)?,
+                parent_id: row.get(2)?,
+                sibling_id: row.get(3)?,
+                page_id: row.get(4)?
+            })
+        })?;
+
+        let mut row_block_vector = Vec::new();
+
+        for row in rows {
+            row_block_vector.push(row.unwrap());
+        }
+
+        return Ok(row_block_vector);
+
+    }
 }
 
 /// a BlockRow is a direct translation of a block row from the 
