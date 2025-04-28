@@ -1,4 +1,5 @@
 mod block;
+mod page;
 mod db;
 
 use std::fs;
