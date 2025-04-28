@@ -79,6 +79,7 @@ name = "rustseq"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "tree_iterators_rs",
 ]
 
 [[package]]
@@ -86,6 +87,21 @@ name = "smallvec"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8917285742e9f3e1683f0a9c4e6b57960b7314d0b08d30d1ecd426713ee2eee9"
+
+[[package]]
+name = "streaming-iterator"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b2231b7c3057d5e4ad0156fb3dc807d900806020c5ffa3ee6ff2c8c76fb8520"
+
+[[package]]
+name = "tree_iterators_rs"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93243e2901d558d73622302dfb013dc698e291a707a423435cd5feb8805b966f"
+dependencies = [
+ "streaming-iterator",
+]
 
 [[package]]
 name = "vcpkg"
