@@ -56,5 +56,5 @@ fn main() {
 
     internal_page.build_tree();
     
-    
+    println!("{:#?}", internal_page);
 }

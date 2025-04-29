@@ -9,7 +9,8 @@ use crate::{db::{BlockRow, PageRow}};
 pub struct Page {
     page_data: PageRow,
     block_data: Vec<BlockRow>,
-    block_tree: Tree<usize>
+    block_tree: Tree<usize>,
+    in_tree: Vec<bool> // TODO move this inside of build_tree instead
 }
 
 impl Page {
@@ -28,7 +29,8 @@ impl Page {
             block_tree: Tree {
                 value: dummy_index,
                 children: Vec::new()
-            }
+            },
+            in_tree: Vec::new()
         }
     }
 
@@ -42,7 +44,6 @@ impl Page {
 
     fn get_siblings(&self, block_index: usize) -> Vec<usize> {
         let mut sibling_vector = Vec::new();
-        sibling_vector.push(block_index);
 
         let mut current_block = self.block_data.get(block_index).expect(&format!("block not found at index {}", block_index));
 
@@ -74,9 +75,19 @@ impl Page {
         child_vector
     }
 
+    fn set_in_tree(&mut self, block_index: usize, is_in_tree: bool) {
+        let item = self.in_tree.get_mut(block_index).unwrap();
+        *item = is_in_tree;
+    }
+
     /// from the root block build the tree based on parent and sibling
     /// ID fields of the blocks in block_data
     pub fn build_tree(&mut self) {
+
+        // initialize the in_tree vector and set the dummy root block as "in tree"
+        self.in_tree.resize_with(self.block_data.len(), || {false});
+        self.set_in_tree(self.block_tree.value, true);
+
         // find the root block in the data vector
         let root_block_index = self.block_data.iter()
         .position(|block| {
@@ -89,6 +100,7 @@ impl Page {
             value: root_block_index,
             children: Vec::new()
         });
+        self.set_in_tree(root_block_index, true);
 
         let siblings = self.get_siblings(root_block_index);
 
@@ -100,6 +112,18 @@ impl Page {
         }).collect();
 
         // get the siblings of the first child, and add them to children
-        self.block_tree.children.append(&mut sibling_nodes)
+        self.block_tree.children.append(&mut sibling_nodes);
+
+        let children: Vec<usize> = self.block_tree.children.iter().map(|child| {
+            child.value
+        }).collect();
+
+        for child in children {
+            self.set_in_tree(child, true);
+        }
+
+        // tree is ready to be built down iteratively
+        // TODO this would be a good place for multithreading, handing each subtree to a thread
+
     }
 }
