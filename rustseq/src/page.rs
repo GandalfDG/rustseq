@@ -1,10 +1,11 @@
 use tree_iterators_rs::prelude::*;
 
-use crate::{block, db::{BlockRow, PageRow}};
+use crate::{db::{BlockRow, PageRow}};
 
 /// A page is represented by a page object from the
 /// database, and a tree of block objects with the data
 /// for each node contained in the block_data vector
+#[derive(Debug)]
 pub struct Page {
     page_data: PageRow,
     block_data: Vec<BlockRow>,
@@ -31,6 +32,14 @@ impl Page {
         }
     }
 
+    pub fn set_root_block(&mut self, root_block_id: Option<i64>) {
+        self.page_data.root_block_id = root_block_id;
+    }
+
+    pub fn get_block_data_ref(&self) -> &Vec<BlockRow> {
+        &self.block_data
+    }
+
     fn get_siblings(&self, block_index: usize) -> Vec<usize> {
         let mut sibling_vector = Vec::new();
         sibling_vector.push(block_index);
@@ -50,6 +59,21 @@ impl Page {
         return sibling_vector;
     }
 
+    fn get_children(&self, block_index: usize) -> Vec<usize> {
+        let mut child_vector = Vec::new();
+        let current_block = &self.block_data[block_index];
+
+        let children = self.block_data.iter().enumerate().filter(|(_index, block)| {
+            block.parent_id == Some(current_block.id.unwrap())
+        });
+
+        for child in children {
+            child_vector.push(child.0);
+        }
+
+        child_vector
+    }
+
     /// from the root block build the tree based on parent and sibling
     /// ID fields of the blocks in block_data
     pub fn build_tree(&mut self) {
@@ -64,6 +88,18 @@ impl Page {
         self.block_tree.children.push(Tree {
             value: root_block_index,
             children: Vec::new()
-        })
+        });
+
+        let siblings = self.get_siblings(root_block_index);
+
+        let mut sibling_nodes: Vec<Tree<usize>> = siblings.into_iter().map(|sibling| {
+            Tree {
+                value: sibling,
+                children: Vec::new()
+            }
+        }).collect();
+
+        // get the siblings of the first child, and add them to children
+        self.block_tree.children.append(&mut sibling_nodes)
     }
 }

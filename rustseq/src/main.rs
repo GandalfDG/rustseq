@@ -1,11 +1,10 @@
-mod block;
 mod page;
 mod db;
 
 use std::fs;
 
-use block::Block;
-use db::DB;
+use db::{DB, PageRow, BlockRow};
+use page::Page;
 
 const TEST_DB_PATH: &str = "test_db.sqlite";
 
@@ -25,34 +24,37 @@ fn init_test_db() -> DB {
 fn main() {
     let mut database = init_test_db();
 
-    let block1 = Block::new(1, "Hello, world!");
-    let mut block2 = Block::new(2, "This is a child block");
-    let mut block3 = Block::new(3, "this is a sibling");
+    // put a page in the database
+    let mut page_row = PageRow{id: None, title: String::from("test page"), root_block_id: None};
+    database.insert_page(&mut page_row).unwrap();
 
-    block2.set_parent(&block1);
-    block3.set_parent(&block1);
-    block2.set_sibling(&block3);
+    // put some blocks in the database
+    let mut block1 = BlockRow::new("Hello World", None, None, page_row.id);
+    let mut block2 = BlockRow::new("This is a child block", None, None, page_row.id);
+    let mut block3 = BlockRow::new("this is a sibling", None, None, page_row.id);
+    
+    database.insert_block(&mut block1).unwrap();
+    database.insert_block(&mut block2).unwrap();
+    database.insert_block(&mut block3).unwrap();
 
-    println!("{:?}", block2);
-    println!("{:?}", block1.as_block_row());
-    println!("{:?}", block2.as_block_row());
-    println!("{:?}", block3.as_block_row());
+    block2.parent_id = block1.id;
+    block3.parent_id = block1.id;
 
+    database.update_block(&block2).unwrap();
+    database.update_block(&block3).unwrap();
 
-    let root_block_id = database.insert_block(&mut block1.as_block_row()).unwrap();
-    println!("{:?}", root_block_id);
-    let mut block_id = database.insert_block(&mut block2.as_block_row()).unwrap();
-    println!("{:?}", block_id);
-    block_id = database.insert_block(&mut block3.as_block_row()).unwrap();
-    println!("{:?}", block_id);
+    // get the page's blocks from the database
+    let page_blocks = database.get_page_blocks(&page_row).unwrap();
 
-    let page_id = database.insert_page(&mut db::PageRow{id: None, title: String::from("test page"), root_block_id: Some(root_block_id)});
+    println!("{:#?}", page_blocks);
 
-    println!("{}", page_id.unwrap());
+    // put those blocks into the Page tree structure
+    let mut internal_page = Page::new(page_row, page_blocks);
+    internal_page.set_root_block(internal_page.get_block_data_ref()[0].id);
 
-    println!("{:?}", database.get_page_blocks(&db::PageRow{
-        id: Some(1),
-        title: String::from("lol"),
-        root_block_id: Some(1)
-    }))
+    println!("{:#?}", internal_page);
+
+    internal_page.build_tree();
+    
+    
 }

@@ -1,6 +1,6 @@
-use rusqlite;
+use std::result;
 
-use crate::block::Block;
+use rusqlite;
 
 pub struct DB {
     connection: rusqlite::Connection
@@ -49,6 +49,17 @@ impl DB {
         Ok(new_block.id.expect("no block ID"))  
     }
 
+    pub fn update_block(&mut self, updated_block: &BlockRow) -> Result<(), rusqlite::Error> {
+        let transaction = self.connection.transaction()?;
+
+        transaction.execute("UPDATE blocks SET content=?1, parent=?2, next_sibling=?3, page=?4 WHERE id=?5",
+            (&updated_block.content, updated_block.parent_id, updated_block.sibling_id, updated_block.page_id, updated_block.id))?;
+
+        transaction.commit()?;
+
+        return Ok(());
+    }
+
     /// insert a new page into the database, and get back its ID
     pub fn insert_page(&mut self, new_page: &mut PageRow) -> Result<i64, rusqlite::Error> {
         let transaction = self.connection.transaction()?;
@@ -60,6 +71,17 @@ impl DB {
 
         transaction.commit()?;
         Ok(new_page.id.expect("no page ID"))
+    }
+
+    pub fn update_page(&mut self, updated_page: &PageRow) -> Result<(), rusqlite::Error> {
+        let transaction = self.connection.transaction()?;
+
+        transaction.execute("UPDATE blocks SET title=?1, first_block=?2 WHERE id=?3",
+            (&updated_page.title, &updated_page.root_block_id))?;
+
+        transaction.commit()?;
+
+        return Ok(());
     }
 
     pub fn get_page_blocks(&mut self, page: &PageRow) -> Result<Vec<BlockRow>, rusqlite::Error> {
@@ -102,6 +124,13 @@ pub struct BlockRow {
     pub page_id: Option<i64>
 }
 
+impl BlockRow {
+    pub fn new(content: &str, parent_id: Option<i64>, sibling_id: Option<i64>, page_id: Option<i64>) -> Self {
+        BlockRow { id: None, content: String::from(content), parent_id: parent_id, sibling_id: sibling_id, page_id: page_id }
+    }
+}
+
+#[derive(Debug)]
 pub struct PageRow {
    pub id: Option<i64>,
    pub title: String,
