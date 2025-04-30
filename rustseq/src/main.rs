@@ -32,16 +32,21 @@ fn main() {
     let mut block1 = BlockRow::new("Hello World", None, None, page_row.id);
     let mut block2 = BlockRow::new("This is a child block", None, None, page_row.id);
     let mut block3 = BlockRow::new("this is a sibling", None, None, page_row.id);
+    let mut block4 = BlockRow::new("this is a sub-sibling", None, None, page_row.id);
+
     
     database.insert_block(&mut block1).unwrap();
     database.insert_block(&mut block2).unwrap();
     database.insert_block(&mut block3).unwrap();
+    database.insert_block(&mut block4).unwrap();
 
     block2.parent_id = block1.id;
     block3.parent_id = block1.id;
+    block4.parent_id = block3.id;
 
     database.update_block(&block2).unwrap();
     database.update_block(&block3).unwrap();
+    database.update_block(&block4).unwrap();
 
     // get the page's blocks from the database
     let page_blocks = database.get_page_blocks(&page_row).unwrap();
@@ -50,11 +55,7 @@ fn main() {
 
     // put those blocks into the Page tree structure
     let mut internal_page = Page::new(page_row, page_blocks);
-    internal_page.set_root_block(internal_page.get_block_data_ref()[0].id);
-
-    println!("{:#?}", internal_page);
-
+    // internal_page.set_root_block(internal_page.get_block_data_ref()[0].id);
     internal_page.build_tree();
-    
-    println!("{:#?}", internal_page);
+
 }

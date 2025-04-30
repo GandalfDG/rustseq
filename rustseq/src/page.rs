@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use tree_iterators_rs::prelude::*;
 
 use crate::db::{BlockRow, PageRow};
@@ -8,25 +10,32 @@ use crate::db::{BlockRow, PageRow};
 #[derive(Debug)]
 pub struct Page {
     page_data: PageRow,
-    block_data: Vec<BlockRow>,
+    block_data: HashMap<i64, BlockRow>,
     block_tree: Tree<usize>,
 }
 
 impl Page {
     pub fn new(page_row: PageRow, block_data: Vec<BlockRow>) -> Self {
 
-        // create a mutable binding for the block data vector we're moving
-        let mut block_vec = block_data;
+        let mut block_map = HashMap::new();
+        
+        for block in block_data.into_iter() {
+            block_map.insert(block.id.unwrap(), block);
+        }
 
-        // create a dummy block for the tree root since a page may have multiple siblings at the top level
-        block_vec.push(BlockRow { id: None, content: String::from(&page_row.title), parent_id: None, sibling_id: None, page_id: None });
-        let dummy_index = block_vec.len() - 1;
+        block_map.insert(0, BlockRow{
+            id: None, 
+            content: String::from(""), 
+            parent_id: None, 
+            sibling_id: None, 
+            page_id: page_row.id
+        });
         
         Page {
             page_data: page_row,
-            block_data: block_vec,
+            block_data: block_map,
             block_tree: Tree {
-                value: dummy_index,
+                value: 0,
                 children: Vec::new()
             }
         }
@@ -36,88 +45,56 @@ impl Page {
         self.page_data.root_block_id = root_block_id;
     }
 
-    pub fn get_block_data_ref(&self) -> &Vec<BlockRow> {
-        &self.block_data
-    }
-
-    fn get_siblings(&self, block_index: usize) -> Vec<usize> {
-        let mut sibling_vector = Vec::new();
-
-        let mut current_block = self.block_data.get(block_index).expect(&format!("block not found at index {}", block_index));
-
-        while matches!(current_block.sibling_id, Option::Some(_)) {
-            // find the sibling block's index
-            let sibling_idx = self.block_data.iter().position(|block| {
-                block.id == current_block.sibling_id
-            }).expect(&format!("sibling not found with id {}", current_block.sibling_id.unwrap()));
-
-            sibling_vector.push(sibling_idx);
-            current_block = self.block_data.get(sibling_idx).unwrap();
-        }
-
-        return sibling_vector;
-    }
-
-    fn get_children(&self, block_index: usize) -> Vec<usize> {
-        let mut child_vector = Vec::new();
-        let current_block = &self.block_data[block_index];
-
-        let children = self.block_data.iter().enumerate().filter(|(_index, block)| {
-            block.parent_id == Some(current_block.id.unwrap())
-        });
-
-        for child in children {
-            child_vector.push(child.0);
-        }
-
-        child_vector
-    }
-
     /// from the root block build the tree based on parent and sibling
     /// ID fields of the blocks in block_data
+    /// Since our DB representation holds parent and sibling, a top-down
+    /// approach doesn't really make sense.
+    /// 
+    /// for each parent_id create a linked list of siblings and put those
+    /// into a map keyed by parent_id
+    /// 
+    /// for each parent_id list create a Tree with the parent ID and the 
+    /// children as Trees
     pub fn build_tree(&mut self) {
-        
-        let mut in_tree: Vec<bool> = Vec::with_capacity(self.block_data.len());
-        in_tree.fill_with(|| {false});
+        let mut block_id_map: HashMap<i64, Tree<i64>> = HashMap::new();
+        let mut parent_id_map: HashMap<i64, Vec<i64>> = HashMap::new();
 
-        // initialize the in_tree vector and set the dummy root block as "in tree"
-        in_tree[self.block_tree.value] = true;
-
-        // find the root block in the data vector
-        let root_block_index = self.block_data.iter()
-        .position(|block| {
-            block.id.is_some() && 
-            block.id.unwrap() == self.page_data.root_block_id.unwrap()
-        }).unwrap();
-
-        // add the first block to the tree under the dummy root 
-        self.block_tree.children.push(Tree {
-            value: root_block_index,
-            children: Vec::new()
-        });
-
-        in_tree[root_block_index] = true;
-
-        let siblings = self.get_siblings(root_block_index);
-
-        let mut sibling_nodes: Vec<Tree<usize>> = siblings.into_iter().map(|sibling| {
-            Tree {
-                value: sibling,
+        // create a map of Tree nodes by block ID for fast lookup
+        // and a map of parent block IDs to lists of child IDs
+        for (block_id, block) in self.block_data.iter() {
+            let id = *block_id;
+            block_id_map.insert(id, Tree {
+                value: id,
                 children: Vec::new()
-            }
-        }).collect();
+            });
 
-        // get the siblings of the first child, and add them to children
-        self.block_tree.children.append(&mut sibling_nodes);
-
-        let children = self.block_tree.children.iter();
-
-        for child in children {
-            in_tree[child.value] = true;
+            if let Some(parent_id) = block.parent_id {
+                parent_id_map.entry(parent_id).or_insert(Vec::new()).push(id);
+            };
         }
 
-        // tree is ready to be built down iteratively
-        // TODO this would be a good place for multithreading, handing each subtree to a thread
+        // create subtrees indexed by the id of their root node
+        let mut subtree_map: HashMap<i64, Tree<i64>> = HashMap::new();
+
+        // attach children to parents
+        for(parent_id, child_ids) in parent_id_map {
+            // get a parent node
+            let mut parent_tree = block_id_map.get(&parent_id).unwrap().clone();
+            for child_id in child_ids {
+                parent_tree.children.push(block_id_map.get(&child_id).unwrap().clone())
+            }
+            
+            subtree_map.insert(parent_id, parent_tree);
+        }
+
+        //
+
+
+        // for (_id, subtree) in lookup.iter() {
+        //     let block_data = self.block_data.get(subtree.value).unwrap();
+        //     let parent = lookup.get(&block_data.parent_id.unwrap()).unwrap();
+        //     parent.children.push(subtree.clone());
+        // }
 
     }
 }
