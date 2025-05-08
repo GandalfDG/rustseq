@@ -89,12 +89,13 @@ impl Page {
         while subtrees.len() > 1 {
             let mut next_subtrees: HashMap<i64, Tree<i64>> = HashMap::new();
             for subtree_root_id in subtrees.keys() {
-                if *subtree_root_id == 0 {
-                    continue;
-                }
+
                 let subtree = subtrees.get(subtree_root_id).unwrap().clone();
-                let block = self.block_data.get(&subtree.value).unwrap();
-                let parent_id = block.parent_id.unwrap_or(0);
+                let optblock = self.block_data.get(&subtree.value);
+                let mut parent_id = 0;
+                if let Some(block) = optblock {
+                    parent_id = block.parent_id.unwrap_or(0);  
+                } 
 
                 if let None = next_subtrees.get(&parent_id) {
                     next_subtrees.insert(parent_id, Tree{ value: parent_id, children: Vec::new() });
@@ -107,6 +108,6 @@ impl Page {
             subtrees = next_subtrees;
         }
 
-        println!("hello");
+        println!("{:#?}", subtrees.get(&0).unwrap());
     }
 }

@@ -44,6 +44,12 @@ fn main() {
     block3.parent_id = block1.id;
     block4.parent_id = block3.id;
 
+    //        1
+    //      /  \
+    //     2    3
+    //         / 
+    //        4
+
     database.update_block(&block2).unwrap();
     database.update_block(&block3).unwrap();
     database.update_block(&block4).unwrap();
