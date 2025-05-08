@@ -34,14 +34,24 @@ impl Page {
         }
     }
 
+    fn get_leaves(&self, blocks_by_parent: &HashMap<i64, Vec<i64>>) -> Vec<i64> {
+        let mut leaf_block_ids = Vec::new();
+        
+        for (block_id, _block) in self.block_data.iter() {
+            // check that no block has this block as a parent
+            if let None = blocks_by_parent.get(block_id) {
+                leaf_block_ids.push(*block_id)
+            }
+        }
+
+        return leaf_block_ids;
+    }
 
     /// create a tree of Tree<usize> nodes representing the blocks of the page.
     /// Each node contains the ID of a block and a vector of child Tree<usize>
     /// nodes.
     pub fn build_tree(&mut self) {
-        // create a mirror of the block_data map with block IDs to keep track of blocks
-        // which haven't yet been added to the tree
-        let mut remaining_blocks: Vec<i64> = self.block_data.keys().copied().collect();
+        // hash map containing child block ID vectors for each parent ID
         let mut blocks_by_parent: HashMap<i64, Vec<i64>> = HashMap::new();
 
         for (block_id, block) in self.block_data.iter() {
@@ -52,27 +62,51 @@ impl Page {
             blocks_by_parent.get_mut(&parent_id).unwrap().push(*block_id);
         }
 
-        let mut tree: Tree<i64> = Tree {
-            value: 0,
-            children: blocks_by_parent.remove(&0).unwrap().iter().map(|block_id| {
-                Tree {
-                    value: *block_id,
-                    children: Vec::new()
-                }
-            }).collect()
-        };
+        let leaf_block_ids = self.get_leaves(&blocks_by_parent);
 
+        // key is tree parent ID, value is the subtree itself
         let mut subtrees: HashMap<i64, Tree<i64>> = HashMap::new();
-        subtrees.insert(0, tree);
 
-        for (parent_id, child_id_vec) in blocks_by_parent.iter_mut() {
-            subtrees.insert(*parent_id, child_id_vec.iter().map(|child| {
-                Tree {
-                    value: *child,
-                    children: Vec::new()
-                }
-            }).collect());
+        // attach the leaves to their parents
+        for block_id in leaf_block_ids {
+
+            // the data associated with the leaf block id
+            let block = self.block_data.get(&block_id).unwrap();
+
+            // the block ID of the parent of the current block
+            let parent_id = block.parent_id.unwrap_or(0);
+            
+            if let None = subtrees.get(&parent_id) {
+                subtrees.insert(parent_id, Tree { value: parent_id, children: Vec::new() });
+            }
+
+            let parent_tree = subtrees.get_mut(&parent_id).unwrap();
+            parent_tree.children.push(Tree { value: block_id, children: Vec::new() });
         }
 
+        // subtrees from subtrees will be joined into new subtrees here
+        // attach subtrees to their parents up until they reach the root
+        while subtrees.len() > 1 {
+            let mut next_subtrees: HashMap<i64, Tree<i64>> = HashMap::new();
+            for subtree_root_id in subtrees.keys() {
+                if *subtree_root_id == 0 {
+                    continue;
+                }
+                let subtree = subtrees.get(subtree_root_id).unwrap().clone();
+                let block = self.block_data.get(&subtree.value).unwrap();
+                let parent_id = block.parent_id.unwrap_or(0);
+
+                if let None = next_subtrees.get(&parent_id) {
+                    next_subtrees.insert(parent_id, Tree{ value: parent_id, children: Vec::new() });
+                }
+
+                let parent_tree = next_subtrees.get_mut(&parent_id).unwrap();
+                parent_tree.children.push(subtree);
+            }
+
+            subtrees = next_subtrees;
+        }
+
+        println!("hello");
     }
 }
