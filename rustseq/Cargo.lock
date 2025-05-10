@@ -79,6 +79,7 @@ name = "rustseq"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "streaming-iterator",
  "tree_iterators_rs",
 ]
 
