@@ -91,23 +91,47 @@ impl Page {
             for subtree_root_id in subtrees.keys() {
 
                 let subtree = subtrees.get(subtree_root_id).unwrap().clone();
-                let optblock = self.block_data.get(&subtree.value);
-                let mut parent_id = 0;
-                if let Some(block) = optblock {
-                    parent_id = block.parent_id.unwrap_or(0);  
+
+                // subtree with value 0 is already at the root
+                if subtree.value == 0 {
+                    next_subtrees.insert(0, subtree);
                 } 
 
-                if let None = next_subtrees.get(&parent_id) {
-                    next_subtrees.insert(parent_id, Tree{ value: parent_id, children: Vec::new() });
-                }
+                // non-root subtree
+                else {
+                    let optblock = self.block_data.get(&subtree.value);
+                    let parent_id;
+                    match optblock {
+                        Some(block) => {
+                            parent_id = block.parent_id.unwrap_or(0);
+                        }
+                        None => {
+                            parent_id = 0;
+                        }
+                    }
 
-                let parent_tree = next_subtrees.get_mut(&parent_id).unwrap();
-                parent_tree.children.push(subtree);
+                    match next_subtrees.get_mut(&parent_id) {
+                        Some(parent_subtree) => {
+                            parent_subtree.children.push(subtree);
+                        }
+                        None => {
+                            next_subtrees.insert(parent_id, Tree {
+                                value: parent_id,
+                                children: vec![subtree]
+                            });
+                        }
+                    }
+                }
             }
 
             subtrees = next_subtrees;
         }
 
-        println!("{:#?}", subtrees.get(&0).unwrap());
+        self.block_tree = subtrees.get(&0).unwrap().clone();
+
+
+
+        let tree_vec: Vec<&i64> = self.block_tree.dfs_preorder_iter().collect();
+        println!("{:?}", tree_vec);
     }
 }
