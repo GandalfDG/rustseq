@@ -136,6 +136,10 @@ impl Page {
 
         let final_tree = subtrees[0].clone();
         self.block_tree = final_tree.take();
-        // println!("{:?}", nodes)
+    }
+
+    pub fn print_tree(&self) {
+        let nodes: Vec<&i64> = self.block_tree.dfs_preorder_iter().collect();
+        println!("{nodes:?}");
     }
 }

@@ -61,7 +61,8 @@ fn main() {
 
     // put those blocks into the Page tree structure
     let mut internal_page = Page::new(page_row, page_blocks);
-    // internal_page.set_root_block(internal_page.get_block_data_ref()[0].id);
     internal_page.build_tree();
+    // internal_page.set_root_block(internal_page.get_block_data_ref()[0].id);
+    internal_page.print_tree();
 
 }
