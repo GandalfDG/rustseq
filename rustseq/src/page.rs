@@ -1,4 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use tree_iterators_rs::prelude::*;
 use streaming_iterator::StreamingIterator;
@@ -65,73 +67,75 @@ impl Page {
         let leaf_block_ids = self.get_leaves(&blocks_by_parent);
 
         // key is tree parent ID, value is the subtree itself
-        let mut subtrees: HashMap<i64, Tree<i64>> = HashMap::new();
+        let mut subtrees: Vec<Rc<RefCell<Tree<i64>>>> = Vec::new();
 
-        // attach the leaves to their parents
+        // each leaf node becomes the tip of its own subtree
         for block_id in leaf_block_ids {
-
-            // the data associated with the leaf block id
-            let block = self.block_data.get(&block_id).unwrap();
-
-            // the block ID of the parent of the current block
-            let parent_id = block.parent_id.unwrap_or(0);
-            
-            if let None = subtrees.get(&parent_id) {
-                subtrees.insert(parent_id, Tree { value: parent_id, children: Vec::new() });
-            }
-
-            let parent_tree = subtrees.get_mut(&parent_id).unwrap();
-            parent_tree.children.push(Tree { value: block_id, children: Vec::new() });
+            subtrees.push(
+                Rc::new(
+                    RefCell::new(
+                        Tree {
+                            value: block_id,
+                            children: Vec::new()
+                        }
+                    )
+                )
+            );
         }
 
+        let mut visited_nodes: Vec<Rc<RefCell<Tree<i64>>>> = Vec::new();
+        for blockref in subtrees.iter() {
+            visited_nodes.push(Rc::clone(blockref));
+        } 
+
+        // TODO store smart pointers to each tree node so we can access any processed 
+        // node from a subtree to get around the node duplication behavior
         // subtrees from subtrees will be joined into new subtrees here
         // attach subtrees to their parents up until they reach the root
-        while subtrees.len() > 1 {
-            let mut next_subtrees: HashMap<i64, Tree<i64>> = HashMap::new();
-            for subtree_root_id in subtrees.keys() {
+        let mut new_subtrees: Vec<Rc<RefCell<Tree<i64>>>> = Vec::new();
 
-                let subtree = subtrees.get(subtree_root_id).unwrap().clone();
+        while visited_nodes.len() <= (self.block_data.len())  {
 
-                // subtree with value 0 is already at the root
-                if subtree.value == 0 {
-                    next_subtrees.insert(0, subtree);
-                } 
+            for subtree_ref in subtrees.iter() {
+                // find the parent ID for the root of the subtree
+                let block = self.block_data.get(&subtree_ref.borrow().value).unwrap();
+                let parent_id = block.parent_id.unwrap_or(0);
 
-                // non-root subtree
-                else {
-                    let optblock = self.block_data.get(&subtree.value);
-                    let parent_id;
-                    match optblock {
-                        Some(block) => {
-                            parent_id = block.parent_id.unwrap_or(0);
-                        }
-                        None => {
-                            parent_id = 0;
-                        }
+                // is the parent node a node we've already visited?
+                let visited_node = visited_nodes.iter().find(|tree| {
+                    tree.borrow().value == parent_id
+                });
+
+                match visited_node {
+                    // if we've visited this node, attach the current subtree as a child of the node
+                    Some(node) => {
+                        let subtree = subtree_ref.borrow().clone();
+                        node.borrow_mut().children.push(subtree);
                     }
-
-                    match next_subtrees.get_mut(&parent_id) {
-                        Some(parent_subtree) => {
-                            parent_subtree.children.push(subtree);
-                        }
-                        None => {
-                            next_subtrees.insert(parent_id, Tree {
-                                value: parent_id,
-                                children: vec![subtree]
-                            });
-                        }
+                    // otherwise, create a node for the parent
+                    None => {
+                        let new_subtree = Tree{
+                            value: parent_id,
+                            children: vec![subtree_ref.borrow().clone()]
+                        };
+                        let new_subtree_ref = Rc::new(
+                            RefCell::new(new_subtree)
+                        );
+                        new_subtrees.push(Rc::clone(&new_subtree_ref));
+                        visited_nodes.push(Rc::clone(&new_subtree_ref));
                     }
                 }
+
+                // add our node to visited
             }
 
-            subtrees = next_subtrees;
+            subtrees = new_subtrees.clone();
+            new_subtrees.clear();
+
         }
 
-        self.block_tree = subtrees.get(&0).unwrap().clone();
-
-
-
-        let tree_vec: Vec<&i64> = self.block_tree.dfs_preorder_iter().collect();
-        println!("{:?}", tree_vec);
+        let final_tree = subtrees[0].clone();
+        self.block_tree = final_tree.take();
+        // println!("{:?}", nodes)
     }
 }
