@@ -67,11 +67,11 @@ impl Page {
         let leaf_block_ids = self.get_leaves(&blocks_by_parent);
 
         // key is tree parent ID, value is the subtree itself
-        let mut subtrees: Vec<Rc<RefCell<Tree<i64>>>> = Vec::new();
+        let mut leaves: Vec<Rc<RefCell<Tree<i64>>>> = Vec::new();
 
         // each leaf node becomes the tip of its own subtree
         for block_id in leaf_block_ids {
-            subtrees.push(
+            leaves.push(
                 Rc::new(
                     RefCell::new(
                         Tree {
@@ -84,19 +84,61 @@ impl Page {
         }
 
         let mut visited_nodes: Vec<Rc<RefCell<Tree<i64>>>> = Vec::new();
-        for blockref in subtrees.iter() {
+        for blockref in leaves.iter() {
             visited_nodes.push(Rc::clone(blockref));
         } 
 
-        // TODO store smart pointers to each tree node so we can access any processed 
-        // node from a subtree to get around the node duplication behavior
+        // TODO OK, now try for each leaf getting to the root before going to another leaf
         // subtrees from subtrees will be joined into new subtrees here
         // attach subtrees to their parents up until they reach the root
         let mut new_subtrees: Vec<Rc<RefCell<Tree<i64>>>> = Vec::new();
 
+        for leaf_ref in leaves.iter() {
+            // go from the leaf until reaching the root or until reaching an already visited node
+            let subtree_root_block = self.block_data.get(&leaf_ref.borrow().value);
+            loop {
+
+                if let Some(block) = subtree_root_block {
+                    // the root of the subtree is not the 0 node
+                    // either we have a parent block, or the parent is the 0 node
+                    let subtree_parent_id = block.parent_id.unwrap_or(0);
+
+                    let visited_node = visited_nodes.iter().find(|tree| {
+                        tree.borrow().value == subtree_parent_id
+                    });
+
+                    let current_subtree_ref = Rc::clone(leaf_ref);
+                    let new_subtree_root;
+                    match visited_node {
+                        Some(parent_subtree) => {
+                            // get the parent node subtree mutable reference and move the current
+                            // subtree into the children vector
+                            parent_subtree.borrow_mut().children.push(current_subtree_ref.borrow().clone());
+                            break;
+                        }
+                        None => {
+                            // create a parent node subtree and add a reference to visited_nodes
+                            let parent_subtree = Tree {
+                                value: subtree_parent_id,
+                                children: vec![current_subtree_ref.borrow().clone()]
+                            };
+                            new_subtree_root = Rc::new(
+                                RefCell::new(parent_subtree)
+                            );
+
+                            visited_nodes.push(new_subtree_root)
+                        }
+                    }
+
+                }
+
+                subtree_root_block = Rc::clone(new_subtree_root);
+            }
+        }
+
         while visited_nodes.len() <= (self.block_data.len())  {
 
-            for subtree_ref in subtrees.iter() {
+            for subtree_ref in leaves.iter() {
                 // find the parent ID for the root of the subtree
                 let block = self.block_data.get(&subtree_ref.borrow().value).unwrap();
                 let parent_id = block.parent_id.unwrap_or(0);
@@ -129,12 +171,12 @@ impl Page {
                 // add our node to visited
             }
 
-            subtrees = new_subtrees.clone();
+            leaves = new_subtrees.clone();
             new_subtrees.clear();
 
         }
 
-        let final_tree = subtrees[0].clone();
+        let final_tree = leaves[0].clone();
         self.block_tree = final_tree.take();
     }
 
