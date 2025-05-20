@@ -49,6 +49,20 @@ impl Page {
         return leaf_block_ids;
     }
 
+    /// iterate through the built tree and sort child nodes by their
+    /// next_sibling fields
+    /// return a properly sorted tree
+    fn sort_children(&self, mut built_tree: Tree<i64>) -> Tree<i64> {
+        let mut tree_iter = built_tree.dfs_preorder_iter_mut().attach_context();
+
+        while let Some(node) = tree_iter.next_mut() {
+            let mut children = node.children_mut();
+            
+        }
+
+        Tree{value: 0, children:Vec::new()}
+    }
+
     /// create a tree of Tree<usize> nodes representing the blocks of the page.
     /// Each node contains the ID of a block and a vector of child Tree<usize>
     /// nodes.
@@ -86,8 +100,8 @@ impl Page {
         // key: block id, value: subtree vector index
         let mut known_nodes: HashMap<i64, usize> = HashMap::new();
 
-        // TODO OK, now try for each leaf getting to the root before going to another leaf
-        // subtrees from subtrees will be joined into new subtrees here
+        // OK, now try for each leaf getting to the root before going to another leaf
+        // subtrees from `subtrees` will be joined into new subtrees here
         // attach subtrees to their parents up until they reach the root
 
         // Take the leaf from the vector
@@ -118,6 +132,8 @@ impl Page {
                             let mut known_node_iter = known_node_subtree.dfs_preorder_iter_mut().attach_context();
 
                             while let Some(context) = known_node_iter.next_mut() {
+
+                                // the context ancestors field includes the current node's value
                                 let current_node_value = context.ancestors().last().unwrap();
                                 if **current_node_value !=  parent_id { continue; }
 
@@ -141,7 +157,6 @@ impl Page {
                         // the current node is a child of the root node
                         // store this subtree in subtrees
                         subtrees.push(current_node.clone());
-                        current_node_opt = None;
                         break;
                     }
                     
