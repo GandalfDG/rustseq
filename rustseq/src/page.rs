@@ -1,10 +1,9 @@
-use std::ops::DerefMut;
-use std::{collections::HashMap, ops::Deref};
-use std::rc::Rc;
-use std::cell::RefCell;
+
+use std::{collections::HashMap};
+
 
 use tree_iterators_rs::prelude::*;
-use streaming_iterator::StreamingIterator;
+use streaming_iterator::StreamingIteratorMut;
 
 use crate::db::{BlockRow, PageRow};
 
@@ -94,9 +93,10 @@ impl Page {
         // Take the leaf from the vector
         for (subtree_index, leaf) in leaves.into_iter().enumerate() {
             // go from the leaf until reaching the root or until reaching an already visited node
-            let mut current_node: Tree<i64> = leaf;
+            let mut current_node_opt: Option<Tree<i64>> = Some(leaf);
 
-            loop {
+            while let Some(ref current_node) = current_node_opt {
+                // build the subtree up until reaching the root or a known node
 
                 // store the current node value in the known_nodes map
                 known_nodes.insert(current_node.value, subtree_index);
@@ -115,28 +115,40 @@ impl Page {
                             // iterate the indicated subtree to find the node, append the current node
                             // to its children and break
                             let known_node_subtree = subtrees.get_mut(*known_node_subtree_index).expect("if it's a known node, the subtree must exist in subtrees");
-                            let mut parent_node = known_node_subtree.dfs_postorder_iter_mut().attach_context().find(|node| {
-                                node.value == parent_id
-                            });
+                            let mut known_node_iter = known_node_subtree.dfs_preorder_iter_mut().attach_context();
+
+                            while let Some(context) = known_node_iter.next_mut() {
+                                let current_node_value = context.ancestors().last().unwrap();
+                                if **current_node_value !=  parent_id { continue; }
+
+                                let children = context.children_mut();
+                                children.push(current_node.clone());
+                                current_node_opt = None;
+                                break;
+                            }
+
                         } else {
                             // create the parent node, update current_node and continue
                             let parent_node = Tree {
                                 value: parent_id,
-                                children: vec![current_node]
+                                children: vec![current_node.clone()]
                             };
 
-                            current_node = parent_node;
+                            current_node_opt = Some(parent_node);
                         }
                     }
                     None => {
                         // the current node is a child of the root node
                         // store this subtree in subtrees
-                        subtrees.push(current_node);
+                        subtrees.push(current_node.clone());
+                        current_node_opt = None;
                         break;
                     }
+                    
                 }
             }
         }
+        self.block_tree = subtrees.remove(0);
     }
 
     pub fn print_tree(&self) {
