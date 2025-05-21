@@ -9,7 +9,7 @@ use crate::db::{BlockRow, PageRow};
 
 /// A page is represented by a page object from the
 /// database, and a tree of block objects with the data
-/// for each node contained in the block_data vector
+/// for each node contained in the block_data `HashMap`
 #[derive(Debug)]
 pub struct Page {
     page_data: PageRow,
@@ -36,49 +36,12 @@ impl Page {
         }
     }
 
-    fn get_leaves(&self, blocks_by_parent: &HashMap<i64, Vec<i64>>) -> Vec<i64> {
-        let mut leaf_block_ids = Vec::new();
-        
-        for (block_id, _block) in self.block_data.iter() {
-            // check that no block has this block as a parent
-            if let None = blocks_by_parent.get(block_id) {
-                leaf_block_ids.push(*block_id)
-            }
-        }
-
-        return leaf_block_ids;
-    }
-
-    /// iterate through the built tree and sort child nodes by their
-    /// next_sibling fields
-    /// return a properly sorted tree
-    fn sort_children(&self, mut built_tree: Tree<i64>) -> Tree<i64> {
-        let mut tree_iter = built_tree.dfs_preorder_iter_mut().attach_context();
-
-        while let Some(node) = tree_iter.next_mut() {
-            let mut children = node.children_mut();
-            
-        }
-
-        Tree{value: 0, children:Vec::new()}
-    }
-
-    /// create a tree of Tree<usize> nodes representing the blocks of the page.
-    /// Each node contains the ID of a block and a vector of child Tree<usize>
+    /// create a tree of `Tree<usize>` nodes representing the blocks of the page.
+    /// Each node contains the ID of a block and a vector of child `Tree<usize>`
     /// nodes.
     pub fn build_tree(&mut self) {
-        // hash map containing child block ID vectors for each parent ID
-        let mut blocks_by_parent: HashMap<i64, Vec<i64>> = HashMap::new();
 
-        for (block_id, block) in self.block_data.iter() {
-            let parent_id = block.parent_id.unwrap_or(0);
-            if let None = blocks_by_parent.get_mut(&parent_id) {
-                blocks_by_parent.insert(parent_id, Vec::new());
-            }
-            blocks_by_parent.get_mut(&parent_id).unwrap().push(*block_id);
-        }
-
-        let leaf_block_ids = self.get_leaves(&blocks_by_parent);
+        let leaf_block_ids = self.get_leaves();
 
         // key is tree parent ID, value is the subtree itself
         let mut leaves: Vec<Tree<i64>> = Vec::new();
@@ -163,11 +126,58 @@ impl Page {
                 }
             }
         }
-        self.block_tree = subtrees.remove(0);
+        let unsorted_tree = subtrees.remove(0);
+        // self.block_tree = self.sort_children(unsorted_tree);
+        self.block_tree = unsorted_tree;
     }
 
+    /// traverse the tree depth-first and print the value of each node along the way
     pub fn print_tree(&self) {
         let nodes: Vec<&i64> = self.block_tree.dfs_preorder_iter().collect();
         println!("{nodes:?}");
     }
+
+    /// find the leaf nodes for the tree.
+    /// these are the blocks which no other block calls parent
+    fn get_leaves(&self) -> Vec<i64> {
+        // hash map containing child block ID vectors for each parent ID
+        let mut blocks_by_parent: HashMap<i64, Vec<i64>> = HashMap::new();
+
+        for (block_id, block) in self.block_data.iter() {
+            let parent_id = block.parent_id.unwrap_or(0);
+            if let None = blocks_by_parent.get_mut(&parent_id) {
+                blocks_by_parent.insert(parent_id, Vec::new());
+            }
+            blocks_by_parent.get_mut(&parent_id).unwrap().push(*block_id);
+        }
+
+        let mut leaf_block_ids = Vec::new();
+        
+        for (block_id, _block) in self.block_data.iter() {
+            // check that no block has this block as a parent
+            if let None = blocks_by_parent.get(block_id) {
+                leaf_block_ids.push(*block_id)
+            }
+        }
+
+        return leaf_block_ids;
+    }
+
+    /// iterate through the built tree and sort child nodes by their
+    /// next_sibling fields
+    /// return a properly sorted tree
+    fn sort_children(&self, mut built_tree: Tree<i64>) -> Tree<i64> {
+        let mut tree_iter = built_tree.dfs_preorder_iter_mut().attach_context();
+
+        while let Some(node) = tree_iter.next_mut() {
+            let mut children = node.children_mut();
+            // find the child with no next sibling
+            let last_sibling = children.iter().find(|node| {
+                self.block_data.get(&node.value).unwrap().sibling_id.is_none()
+            });
+        }
+
+        Tree{value: 0, children:Vec::new()}
+    }
+
 }
