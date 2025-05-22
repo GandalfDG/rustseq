@@ -126,7 +126,12 @@ impl Page {
                 }
             }
         }
-        let unsorted_tree = subtrees.remove(0);
+        //make all final subtrees the children of a single 0-value node
+        let mut root_node = Tree{value: 0, children: Vec::with_capacity(subtrees.len())};
+        for subtree in subtrees.into_iter() {
+            root_node.children.push(subtree);
+        }
+        let unsorted_tree = root_node;
         // self.block_tree = self.sort_children(unsorted_tree);
         self.block_tree = unsorted_tree;
     }
@@ -169,15 +174,71 @@ impl Page {
     fn sort_children(&self, mut built_tree: Tree<i64>) -> Tree<i64> {
         let mut tree_iter = built_tree.dfs_preorder_iter_mut().attach_context();
 
+        // for each node in the tree, sort its children
         while let Some(node) = tree_iter.next_mut() {
-            let mut children = node.children_mut();
+            let children = node.children_mut();
+            let mut sorted_children = Vec::new();
             // find the child with no next sibling
             let last_sibling = children.iter().find(|node| {
                 self.block_data.get(&node.value).unwrap().sibling_id.is_none()
             });
+            sorted_children.push(last_sibling);
         }
 
         Tree{value: 0, children:Vec::new()}
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    
+    fn setup_tree() -> Tree<i64> {
+        Tree{value: 1, children: vec![
+            Tree{value: 2, children: vec![]},
+            Tree{value: 3, children: vec![
+                Tree{value: 4, children: vec![]}
+            ]}
+        ]}
+    }
+
+    fn setup_blocks() -> Vec<BlockRow> {
+        vec![
+            BlockRow{id: Some(1), content: String::from("I'm block 1"), parent_id: None, sibling_id: None, page_id: None},
+            BlockRow{id: Some(2), content: String::from("I'm block 2"), parent_id: Some(1), sibling_id: Some(3), page_id: None},
+            BlockRow{id: Some(3), content: String::from("I'm block 3"), parent_id: Some(1), sibling_id: None, page_id: None},
+            BlockRow{id: Some(4), content: String::from("I'm block 4"), parent_id: Some(3), sibling_id: None, page_id: None},
+            BlockRow{id: Some(5), content: String::from("I'm block 5"), parent_id: None, sibling_id: Some(1), page_id: None}
+        ]
+    }
+
+    fn setup_page() -> Page {
+        Page::new(PageRow{id:None, title:String::from(""), root_block_id: None}, setup_blocks())
+    }
+
+    fn iterate_tree(page: &Page) -> Vec<i64> {
+        let tree = page.block_tree.clone();
+        tree.dfs_preorder().collect()
+    }
+
+    #[test]
+    fn all_nodes_in_tree() {
+        let mut page = setup_page();
+        page.build_tree();
+
+        // check the length of the iterated tree is equal to the number of blocks plus one for the root node
+        let iterated_tree = iterate_tree(&page);
+        assert_eq!(page.block_data.len() + 1, iterated_tree.len())
+    }
+
+    #[test]
+    fn tree_siblings_sorted() {
+        let mut page = setup_page();
+        page.build_tree();
+
+        let iterated_tree = iterate_tree(&page);
+        assert_eq!(vec![0, 5, 1, 2, 3, 4], iterated_tree);
+    }
 }
